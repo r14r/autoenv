@@ -1,11 +1,23 @@
+#
+#
+#
+AUTOENV_VERSION=1.0.0
 AUTOENV_AUTH_FILE="${AUTOENV_AUTH_FILE:-$HOME/.autoenv_authorized}"
 AUTOENV_ENV_FILENAME="${AUTOENV_ENV_FILENAME:-.env}"
 AUTOENV_ENV_LEAVE_FILENAME="${AUTOENV_ENV_LEAVE_FILENAME:-.env.leave}"
-# AUTOENV_ENABLE_LEAVE
+
+AUTOENV_ENABLE_LEAVE=no
+AUTOENV_LOWER_FIRST=no
+AUTOENV_ASSUME_YES=no
+
+# AUTOENV_IN_PROGRESS=-
+
+export AUTOENV_VERSION AUTOENV_IN_PROGRESS
 
 autoenv_init() {
+	echo "DBG: autoenv_init AUTOENV_IN_PROGRESS=$AUTOENV_IN_PROGRESS"
 
-	if [ -n "$AUTOENV_ENABLE_LEAVE" ]; then
+	if [ "$AUTOENV_ENABLE_LEAVE" == yes ]; then
 		autoenv_leave "$@"
 	fi
 
@@ -15,6 +27,7 @@ autoenv_init() {
 	_mountpoint="$(df -P "${PWD}" | tail -n 1 | awk '$0=$NF')"
 	# Remove double slashes, see #125
 	_pwd=$(\echo "${PWD}" | \sed "${_sedregexp}" 's:/+:/:g')
+
 	# Discover all files we need to source
 	# We do this in a subshell so we can cd/chdir
 	_files=$(
@@ -72,6 +85,8 @@ ${_orderedfiles}"
 	if [ -z "${zsh_shwordsplit}" ]; then
 		\unsetopt shwordsplit >/dev/null 2>&1
 	fi
+
+	echo "DBG: autoenv_init AUTOENV_IN_PROGRESS=$AUTOENV_IN_PROGRESS"
 }
 
 autoenv_hashline() {
@@ -151,6 +166,9 @@ autoenv_source() {
 }
 
 autoenv_cd() {
+	echo "DBG: autoenv_cd AUTOENV_IN_PROGRESS=$AUTOENV_IN_PROGRESS"
+	export AUTOENV_IN_PROGRESS=yes
+
 	local _pwd
 	_pwd=${PWD}
 	\command -v chdir >/dev/null 2>&1 && \chdir "${@}" || builtin cd "${@}"
@@ -160,6 +178,10 @@ autoenv_cd() {
 	else
 		\return "${?}"
 	fi
+
+	export AUTOENV_IN_PROGRESS=no
+
+	echo "DBG: autoenv_cd AUTOENV_IN_PROGRESS=$AUTOENV_IN_PROGRESS"
 }
 
 autoenv_leave() {
@@ -174,6 +196,7 @@ autoenv_leave() {
 if setopt 2> /dev/null | grep -q aliasfuncdef; then
 	has_alias_func_def_enabled=true;
 else
+	has_alias_func_def_enabled=false
 	setopt ALIAS_FUNC_DEF 2> /dev/null
 fi
 
