@@ -15,3 +15,4 @@ use_yarn=true
 use_flutter=false
 use_fastlane=false
 use_android=false
+use_java=11

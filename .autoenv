@@ -1,8 +1,9 @@
 #!/usr/local/bin/bash
+#vim: tabstop=4:
 	set -u
 
 #-------------------------------------------------------------------------------
-	_DEPLOY_VERSION=3.0.0-02
+	_DEPLOY_VERSION=1.0.2-01
 
 #-------------------------------------------------------------------------------
 	ARGV=$BASH_ARGV
@@ -13,34 +14,34 @@
 	SYSTEM=$(uname -s)
 
 #-------------------------------------------------------------------------------
-	_DIRENV_CLI="$(which direnv_cli)"
-	[[ -h "$_DIRENV_CLI" ]] && _DIRENV_CLI="$(readlink "$_DIRENV_CLI")"
+	_AUTOENV_CLI="$(which autoenv_cli)"
+	[[ -h "$_AUTOENV_CLI" ]] && _AUTOENV_CLI="$(readlink "$_AUTOENV_CLI")"
 
-	_DIRENV_ROOT="$(dirname "$_DIRENV_CLI")"
+	_AUTOENV_ROOT="$(dirname "$_AUTOENV_CLI")"
 
 	SELF="$(basename "$ARGV")"
 	HERE="$PWD"
 	HERE_SHORT="$(echo "$HERE" | sed "1,\$s#$REPOSITORIES/#<REPOSITORIES>/#")"
 
-	export DIRENV_BASE="$HERE"
-	export DIRENV_HOME="$HERE/.env.d"
+	export AUTOENV_BASE="$HERE"
+	export AUTOENV_HOME="$HERE/.autoenv.d"
 
-	DIRENV_FILE_ENVRC="$DIRENV_BASE/.setenv"
+	AUTOENV_FILE_ENVRC="$AUTOENV_BASE/.autoenv"
 
-	DIRENV_NAME_CONFIG="config"
-	DIRENV_NAME_SSHENV="ssh-environment"
-	DIRENV_NAME_SSHUSR="ssh-user"
+	AUTOENV_NAME_CONFIG="config"
+	AUTOENV_NAME_SSHENV="ssh-environment"
+	AUTOENV_NAME_SSHUSR="ssh-user"
 
-	DIRENV_FILE_CONFIG="$DIRENV_HOME/$DIRENV_NAME_CONFIG"
-	DIRENV_FILE_SSHENV="$DIRENV_HOME/$DIRENV_NAME_SSHENV"
-	DIRENV_FILE_SSHUSR="$DIRENV_HOME/$DIRENV_NAME_SSHUSR"
+	AUTOENV_FILE_CONFIG="$AUTOENV_HOME/$AUTOENV_NAME_CONFIG"
+	AUTOENV_FILE_SSHENV="$AUTOENV_HOME/$AUTOENV_NAME_SSHENV"
+	AUTOENV_FILE_SSHUSR="$AUTOENV_HOME/$AUTOENV_NAME_SSHUSR"
 
-	[[ -f "$DIRENV_FILE_CONFIG" ]] && eval $(grep -E '^use_' $DIRENV_FILE_CONFIG | tr "[:lower:]" "[:upper:]")
+	[[ -f "$AUTOENV_FILE_CONFIG" ]] && eval $(grep -E '^use_' $AUTOENV_FILE_CONFIG | tr "[:lower:]" "[:upper:]")
 
-	export SSH_ENV="$DIRENV_FILE_SSHENV"
+	export SSH_ENV="$AUTOENV_FILE_SSHENV"
 
 	export SSH_USR="default"
-	[[ -f "$DIRENV_FILE_SSHUSR" ]] && export SSH_USR="$(< $DIRENV_FILE_SSHUSR)"
+	[[ -f "$AUTOENV_FILE_SSHUSR" ]] && export SSH_USR="$(< $AUTOENV_FILE_SSHUSR)"
 
 #-------------------------------------------------------------------------------
 	. $HOME/.bashrc
@@ -115,7 +116,7 @@ status() {
 
 #-------------------------------------------------------------------------------
 use_git() {
-	export _GIT_USER=$(< $DIRENV_HOME/ssh-user)
+	export _GIT_USER=$(< $AUTOENV_HOME/ssh-user)
 	export _GIT_EMAIL=$_GIT_USER@via-internet.de
 
 	git config --local user.email $_GIT_EMAIL 2>&-
@@ -127,7 +128,7 @@ use_git() {
 #-------------------------------------------------------------------------------
 use_ssh_agent() {
 	_START=${#SSH_ENV}
-	_REL_PATH="${DIRENV_HOME:$_START}"
+	_REL_PATH="${AUTOENV_HOME:$_START}"
 
 	status  "SSH Agent"     ""	"Init"	""							"$_REL_PATH"
 	/usr/bin/ssh-agent | sed 's/^echo/#echo/' >"${SSH_ENV}"
@@ -153,27 +154,27 @@ use_ssh() {
 
 #-------------------------------------------------------------------------------
 use_python_venv() {
-	export DIRENV_STATUS_HAS_PYTHON=NO
-	export DIRENV_STATUS=
+	export AUTOENV_STATUS_HAS_PYTHON=NO
+	export AUTOENV_STATUS=
 
 	export _PYTHON_PATH="-"
 	export _PYTHON_VERSION="-"
 
 	if [[ "YES" == "$USE_PYTHON" ]]; then
-		if [[ ! -f .env/python/bin/activate ]]; then
-			export DIRENV_STATUS=Missing
+		if [[ ! -f .autoenv.d/python/bin/activate ]]; then
+			export AUTOENV_STATUS=Missing
 		else
-			export DIRENV_STATUS=Enabled
-			export DIRENV_STATUS_HAS_PYTHON=YES
-			. $DIRENV_HOME/python/bin/activate
+			export AUTOENV_STATUS=Enabled
+			export AUTOENV_STATUS_HAS_PYTHON=YES
+			. $AUTOENV_HOME/python/bin/activate
 
 			export _PYTHON_PATH="$(show_path python)"
 			export _PYTHON_VERSION="$(python --version 2>&-|cut -d' ' -f2)"
 
-			export PIP_DOWNLOAD_CACHE=${_DIRENV_ROOT}/cache/pip
+			export PIP_DOWNLOAD_CACHE=${_AUTOENV_ROOT}/cache/pip
 		fi
 	else
-		export DIRENV_STATUS=Disabled
+		export AUTOENV_STATUS=Disabled
 	fi
 }
 
@@ -274,17 +275,21 @@ use_subversion() {
 
 #-------------------------------------------------------------------------------
 use_java() {
+	if [ "$USE_JAVA" == "" ]; then
+		USE_JAVA=8
+	fi
+
 	if [ "${SYSTEM,,}" == "linux" ]; then
-		export JAVA_HOME=/usr/lib/jvm/adoptopenjdk-8-hotspot-amd64
+		export JAVA_HOME=/usr/lib/jvm/adoptopenjdk-${USE_JAVA}-hotspot-amd64
 	else
-		export JAVA_HOME=/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home
+		export JAVA_HOME=/Library/Java/JavaVirtualMachines/adoptopenjdk-${USE_JAVA}.jdk/Contents/Home
 	fi
 
 	path_add "$JAVA_HOME/bin"
 
 	if [ "$(which java)" = "" ]; then
-		export _JAVA_PATH="MISSING"
 		export _JAVA_VERSION="MISSING"
+		export _JAVA_PATH="MISSING"
 	else
 		export _JAVA_VERSION="$(java -version 2>&1 | grep version |cut -d'"' -f2)"
 		export _JAVA_PATH="$JAVA_HOME/bin"
@@ -293,7 +298,7 @@ use_java() {
 
 #-------------------------------------------------------------------------------
 use_groovy() {
-	export GROOVY_ROOT=$DIRENV_BASE/groovy/3.0.1
+	export GROOVY_ROOT=$AUTOENV_BASE/groovy/3.0.1
 	export GROOVY_HOME=$GROOVY_ROOT
 
 	if [ "$(which groovy)" = "" ]; then
@@ -309,7 +314,7 @@ use_groovy() {
 
 #-------------------------------------------------------------------------------
 use_gradle() {
-	export GRADLE_ROOT=$DIRENV_BASE/gradle/$USE_GRADLE
+	export GRADLE_ROOT=$AUTOENV_BASE/gradle/$USE_GRADLE
 	export GRADLE_HOME=$GRADLE_ROOT
 
 	if [ "$(which groovy)" = "" ]; then
@@ -325,7 +330,7 @@ use_gradle() {
 
 #-------------------------------------------------------------------------------
 use_jenkins() {
-	export JENKINS_ROOT=$DIRENV_BASE/jenkins
+	export JENKINS_ROOT=$AUTOENV_BASE/jenkins
 	export JENKINS_HOME=$JENKINS_ROOT/home
 
 	export _JENKINS_VERSION="-"
@@ -334,7 +339,7 @@ use_jenkins() {
 
 #-------------------------------------------------------------------------------
 use_mysql() {
-	export MYSQL_ROOT=$DIRENV_BASE/mysql/8.0.19
+	export MYSQL_ROOT=$AUTOENV_BASE/mysql/8.0.19
 	export MYSQL_HOME=$MYSQL_ROOT
 
 	export _MYSQL_PATH="$MYSQL_HOME/bin"
@@ -348,7 +353,7 @@ use_mysql() {
 use_zeppelin() {
 	export _ZEPPELIN_VERSION=0.8.2
 
-	export _ZEPPELIN_ROOT=$DIRENV_BASE/zeppelin/$_ZEPPELIN_VERSION
+	export _ZEPPELIN_ROOT=$AUTOENV_BASE/zeppelin/$_ZEPPELIN_VERSION
 	export _ZEPPELIN_HOME=$_ZEPPELIN_ROOT
 
 	export _ZEPPELIN_PATH="$_ZEPPELIN_HOME/bin"
@@ -360,7 +365,7 @@ use_zeppelin() {
 use_hadoop() {
 	export _HADOOP_VERSION=3.2.1
 
-	export _HADOOP_ROOT=$DIRENV_BASE/hadoop/$_HADOOP_VERSION
+	export _HADOOP_ROOT=$AUTOENV_BASE/hadoop/$_HADOOP_VERSION
 	export _HADOOP_HOME=$_HADOOP_ROOT
 
 	export _HADOOP_PATH="$_HADOOP_HOME/bin"
@@ -395,7 +400,7 @@ use_config_export() {
 
 #-------------------------------------------------------------------------------
 use_config() {
-	[[ -f "$DIRENV_HOME/config" ]] && eval $(grep -E '^use_' $DIRENV_HOME/config | tr "[:lower:]" "[:upper:]")
+	[[ -f "$AUTOENV_HOME/config" ]] && eval $(grep -E '^use_' $AUTOENV_HOME/config | tr "[:lower:]" "[:upper:]")
 
 	use_config_export USE_IONIC			${USE_IONIC:-NO}
 	use_config_export USE_ANGULAR		${USE_ANGULAR:-NO}
@@ -458,10 +463,10 @@ status_timer	"HERE" ""
 status  		"HERE" ""	"Enabled"	"$_DEPLOY_VERSION"	"$HERE_SHORT"
 
 #status_timer	"ROOT" ""
-#status  		"ROOT" ""	"Enabled"	""					"$_DIRENV_ROOT"
+#status  		"ROOT" ""	"Enabled"	""					"$_AUTOENV_ROOT"
 
 #-------------------------------------------------------------------------------
-export NODE_VERSIONS="$DIRENV_HOME/node"
+export NODE_VERSIONS="$AUTOENV_HOME/node"
 
 export _NODE_VERSION="-"
 export _NODE_PATH="-"
@@ -474,7 +479,7 @@ if [[ "$USE_NODE" != "NO" ]]; then
 		_NODE_VERSION="$(ls -1rt "$NODE_VERSIONS" | sed '1,$s/^v//' |sort -n |tail -1)"
 
 		#use node $_NODE_VERSION
-		export PATH="$NODE_VERSIONS/v$_NODE_VERSION/bin:$DIRENV_HOME/bin:$PATH"
+		export PATH="$NODE_VERSIONS/v$_NODE_VERSION/bin:$AUTOENV_HOME/bin:$PATH"
 
 		# export _NODE_VERSION="$(node --version 2>&- | sed '1,$s/v//g' 2>&-)"
 		export _NODE_PATH="$(show_path node)"
@@ -539,70 +544,70 @@ fi
 if [[ "$USE_ANDROID" != "NO" ]]; then
 	status_timer	"Android"	"$USE_ANDROID"
 	use_android
-	status   		"Android"	"$USE_ANDROID"	"$_ANDROID_VERSION"	"$_ANDROID_PATH"
+	status   		"Android"	"$USE_ANDROID"	"Enabled"	"$_ANDROID_VERSION"	"$_ANDROID_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_PYTHON" != "NO" ]]; then
 	status_timer	"Python"	"$USE_PYTHON"
 	use_python_venv
-	status  		"Python"	"$USE_PYTHON"			"$DIRENV_STATUS"	"$_PYTHON_VERSION"		"$_PYTHON_PATH"
+	status  		"Python"	"$USE_PYTHON"			"$AUTOENV_STATUS"	"$_PYTHON_VERSION"		"$_PYTHON_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_JAVA" != "NO" ]]; then
 	status_timer	"Java"			"$USE_JAVA"
 	use_java
-	status  		"Java"			"$USE_JAVA"			"$DIRENV_STATUS"	"$_JAVA_VERSION"		"$_JAVA_PATH"
+	status  		"Java"			"$USE_JAVA"			"$AUTOENV_STATUS"	"$_JAVA_VERSION"		"$_JAVA_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_GROOVY" != "NO" ]]; then
 	status_timer	"Groovy"		"$USE_GROOVY"
 	use_groovy
-	status  		"Groovy"		"$USE_GROOVY"		"$DIRENV_STATUS"	"$_GROOVY_VERSION"		"$_GROOVY_PATH"
+	status  		"Groovy"		"$USE_GROOVY"		"$AUTOENV_STATUS"	"$_GROOVY_VERSION"		"$_GROOVY_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_GRADLE" != "NO" ]]; then
 	status_timer	"Gradle"		"$USE_GRADLE"
 	use_gradle
-	status  		"Gradle"		"$USE_GRADLE"		"$DIRENV_STATUS"	"$_GRADLE_VERSION"		"$_GRADLE_PATH"
+	status  		"Gradle"		"$USE_GRADLE"		"$AUTOENV_STATUS"	"$_GRADLE_VERSION"		"$_GRADLE_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_MYSQL" != "NO" ]]; then
 	status_timer	"MySQL"			"$USE_MYSQL"
 	use_mysql
-	status  		"MySQL"			"$USE_MYSQL"		"$DIRENV_STATUS"	"$_MYSQL_VERSION"		"$_MYSQL_PATH"
+	status  		"MySQL"			"$USE_MYSQL"		"$AUTOENV_STATUS"	"$_MYSQL_VERSION"		"$_MYSQL_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_SUBVERSION" != "NO" ]]; then
 	status_timer	"Subversion"	"USE=$USE_SUBVERSION"
 	use_subversion
-	status  		"Subversion"	"USE=$USE_SUBVERSION"	"$DIRENV_STATUS"	"$_SUBVERSION_VERSION"		"$_SUBVERSION_PATH"
+	status  		"Subversion"	"USE=$USE_SUBVERSION"	"$AUTOENV_STATUS"	"$_SUBVERSION_VERSION"		"$_SUBVERSION_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_JENKINS" != "NO" ]]; then
 	status_timer	"Jenkins"		"USE=$USE_JENKINS"
 	use_jenkins
-	status  		"Jenkins"		"USE=$USE_JENKINS"	"$DIRENV_STATUS"	"$_JENKINS_VERSION"		"$_JENKINS_PATH"
+	status  		"Jenkins"		"USE=$USE_JENKINS"	"$AUTOENV_STATUS"	"$_JENKINS_VERSION"		"$_JENKINS_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_ZEPPELIN" != "NO" ]]; then
 	status_timer	"Zeppelin"		"USE=$USE_ZEPPELIN"
 	use_zeppelin
-	status  		"Zeppelin"		"USE=$USE_ZEPPELIN"	"$DIRENV_STATUS"	"$_ZEPPELIN_VERSION"	"$_ZEPPELIN_PATH"
+	status  		"Zeppelin"		"USE=$USE_ZEPPELIN"	"$AUTOENV_STATUS"	"$_ZEPPELIN_VERSION"	"$_ZEPPELIN_PATH"
 fi
 
 #-------------------------------------------------------------------------------
 if [[ "$USE_HADOOP" != "NO" ]]; then
 	status_timer	"Hadoop"		"USE=$USE_HADOOP"
 	use_hadoop
-	status  		"Hadoop"		"USE=$USE_HADOOP"	"$DIRENV_STATUS"	"$_HADOOP_VERSION"		"$_HADOOP_PATH"
+	status  		"Hadoop"		"USE=$USE_HADOOP"	"$AUTOENV_STATUS"	"$_HADOOP_VERSION"		"$_HADOOP_PATH"
 fi
 
 #-------------------------------------------------------------------------------
